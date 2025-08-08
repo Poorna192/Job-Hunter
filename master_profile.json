@@ -1,0 +1,105 @@
+{
+  "personal_info": {
+    "name": "Poornachandra Sadhu",
+    "email": "poorna9963@gmail.com",
+    "phone": "+91-7013078868",
+    "linkedin": "https://linkedin.com/in/poorna-chandra-sadhu/",
+    "github": "https://github.com/Poorna192"
+  },
+  "professional_summary": "Cybersecurity professional with two years of experience in penetration testing and vulnerability assessment, expert in Python scripting and Burp Suite. Key achievements include a 40% reduction in security assessment time through automation and a 25% improvement in phishing defense through training programs. A record of identifying and mitigating over 30 high-risk vulnerabilities and enhancing corporate security has been demonstrated through advanced traffic analysis and reducing security risks by 30%.",
+  "work_experience": [
+    {
+      "title": "Cybersecurity Intern",
+      "company": "Digit Defence",
+      "location": "Bengaluru",
+      "dates": "Ends 01/2025",
+      "bullet_points": [
+        "Performed penetration tests on 10+ internal web applications, uncovering critical SQL injection & XSS vulnerabilities.",
+        "Conducted reconnaissance, exploitation, and privilege escalation to identify security flaws.",
+        "Identified & mitigated 30+ vulnerabilities across web applications and networks using Metasploit, Nmap, and BurpSuite.",
+        "Conducted proactive threat hunting, identifying high-risk vulnerabilities before exploitation.",
+        "Reduced security risks by 30% through advanced traffic analysis & attack surface reduction.",
+        "Developed Python scripts to automate network security scans, reducing assessment time by 40%.",
+        "Designed and executed social engineering attack simulations, identifying critical security awareness weaknesses.",
+        "Developed training programs that improved phishing resilience by 25% in the organization."
+      ]
+    }
+  ],
+  "education": [
+    {
+      "institution": "SRM Institute of Science and Technology",
+      "degree": "B.Tech in Electronics & Communication Engineering",
+      "dates": "05/2020 - 06/2024",
+      "gpa": "8.71/10"
+    }
+  ],
+  "skills": {
+    "technical_concepts": [
+      "Penetration Testing",
+      "Vulnerability Assessment",
+      "Threat Hunting",
+      "Incident Response",
+      "Social Engineering",
+      "Network Analysis",
+      "Risk Mitigation",
+      "SIEM Analysis",
+      "EDR",
+      "OWASP Top 10",
+      "Cloud Security"
+    ],
+    "programming": [
+      "Python",
+      "Bash"
+    ],
+    "tools_and_platforms": [
+      "Burp Suite",
+      "Nmap",
+      "Metasploit",
+      "OpenVAS",
+      "Nessus",
+      "Shodan",
+      "Wireshark",
+      "DVWA",
+      "XAMPP",
+      "Windows",
+      "Linux",
+      "Virtual Machines",
+      "Docker",
+      "Kubernetes",
+      "Splunk"
+    ],
+    "soft_skills": [
+      "Adaptability",
+      "Analytical Thinking",
+      "Effective Communication",
+      "Creativity",
+      "Time management"
+    ]
+  },
+  "certifications": [
+    "AI Cybersecurity Associate - IIFIS",
+    "Cyber Security Associate certification from IIFIS",
+    "CyberSecurity Professional Intern - Digit defence",
+    "Python programming certification",
+    "Cybersecurity Professional - NASSCOM Future Prime Skills",
+    "Pursuing CEH (Certified Ethical Hacker) - EC-Council",
+    "Career Essentials in Cybersecurity by Microsoft and Linkedin"
+  ],
+  "projects": [
+    {
+      "name": "Web Application Security Testing Using Burp Suite",
+      "description": "Improved web security by 85% by conducting in-depth assessments using Burp Suite on DVWA on local XAMPP. Configured Burp Suite to analyze and manipulate HTTP requests/responses. Conducted in-depth security assessment of web applications using Burp Suite's tools (Proxy, Intruder, Repeater, Scanner). Identified and exploited common vulnerabilities including SQL Injection, XSS, CSRF, and authentication flaws.",
+      "tools_used": ["XAMPP", "DVWA", "Burp Suite", "SQL Injection", "XSS", "CSRF", "OWASP Top 10"]
+    },
+    {
+      "name": "AI Vulnerability Prioritizer",
+      "description": "Designed and implemented a cybersecurity-focused AI-based tool. Prioritizes known vulnerabilities by analyzing CVE data, exploit availability, and asset risk using machine learning techniques. Integrated vulnerability scanning tools with threat intelligence sources. Automated and enhanced decision-making, significantly improving vulnerability management processes. Achieved improved prioritization accuracy compared to manual scoring, enabling faster response for high-risk threats.",
+      "tools_used": ["OpenVAS", "Nessus", "Shodan", "Exploit-DB", "Python", "Pandas"]
+    },
+    {
+      "name": "Ransomware Behavior Emulation & Detection",
+      "description": "Simulated the behavior of ransomware in a controlled lab environment to understand its impact, propagation techniques, and detection methods. Developed a harmless ransomware-like script to emulate typical ransomware activities such as file encryption, ransom note creation, and system modification. Implemented detection rules based on system events, file I/O patterns, and process anomalies to trigger alerts on suspicious behavior.",
+      "tools_used": ["Python", "AES encryption libraries", "Procmon", "Wireshark", "VirtualBox", "Splunk"]
+    }
+  ]
+}

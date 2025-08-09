@@ -1,13 +1,12 @@
-name: AI Job Search Agent
+name: AI Job Hunter
 
 on:
   schedule:
-    # This runs the script at 15 minutes past every hour
-    - cron: '15 * * * *'
-  workflow_dispatch: # Allows you to run it manually from the Actions tab
+    - cron: "0 * * * *"  # Every hour (UTC)
+  workflow_dispatch:
 
 jobs:
-  build:
+  run-agent:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,17 +16,24 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run the AI Job Agent
-        env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
-        run: python main.py
+      - name: Run AI Agent with logging (keep last 10 logs)
+        run: |
+          mkdir -p logs
+          log_file="logs/run_$(date +"%Y-%m-%d_%H-%M-%S").log"
+          python main.py > "$log_file" 2>&1
+          
+          # Keep only last 10 logs
+          ls -t logs/*.log | tail -n +11 | xargs -r rm --
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v3
+        with:
+          name: ai-agent-logs
+          path: logs/

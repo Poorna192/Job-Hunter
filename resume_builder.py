@@ -1,10 +1,8 @@
-# resume_builder.py
 import google.generativeai as genai
 import json
 import os
 
 try:
-    # Reads the GEMINI_API_KEY from the GitHub Actions secret
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
     if not gemini_api_key:
         raise ValueError("GEMINI_API_KEY secret not found!")
@@ -18,7 +16,6 @@ except Exception as e:
 
 
 def load_master_profile():
-    """Loads the master profile from the JSON file."""
     try:
         with open('master_profile.json', 'r') as f:
             return json.load(f)
@@ -26,10 +23,8 @@ def load_master_profile():
         print("[ERROR] master_profile.json not found!")
         return None
 
+
 def generate_tailored_resume_text(job_description):
-    """
-    Uses the Gemini AI to generate a tailored resume summary and bullet points.
-    """
     if not MODEL:
          return "AI functionality disabled: Gemini API Key not configured or model failed to initialize."
 
@@ -62,9 +57,7 @@ def generate_tailored_resume_text(job_description):
     """
 
     try:
-        print("[AI] Generating tailored resume content...")
         response = MODEL.generate_content(prompt)
-        print("[AI] Successfully generated content.")
         return response.text
     except Exception as e:
         print(f"[ERROR] Failed to generate content from Gemini AI: {e}")

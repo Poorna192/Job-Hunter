@@ -1,126 +1,273 @@
-import time
-from bs4 import BeautifulSoup
-from datetime import datetime
-import json
 import os
+import time
+import random
+import logging
+import requests
+from urllib.parse import quote_plus
+from bs4 import BeautifulSoup
 
-from ai_healer import get_new_selector, update_selectors_file
+try:
+    from jd_filter import filter_relevant_jobs
+except Exception:
+    filter_relevant_jobs = None
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
+try:
+    from sheet_logger import log_job_to_sheet
+except Exception:
+    log_job_to_sheet = None
 
-def load_selectors(site):
-    if not os.path.exists('scraper_selectors.json'):
-        raise FileNotFoundError("scraper_selectors.json not found! Please create it.")
-    with open('scraper_selectors.json', 'r') as f:
-        return json.load(f)[site]
+try:
+    from notifier import send_telegram_alert
+except Exception:
+    send_telegram_alert = None
 
-def fetch_jobs_from_naukri_scraper(query, location, posted_within_hours=1):
-    selectors = load_selectors('naukri')
-    jobs = []
-    query_formatted = query.lower().replace(" or ", " ").replace(" ", "-")
-    location_formatted = location.lower()
-    url = f"https://www.naukri.com/{query_formatted}-jobs-in-{location_formatted}?sort=f"
-    print(f"[INFO] Scraping Naukri URL: {url}")
+LOG = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
+SERPAPI_KEY = os.getenv("SERPAPI_KEY")
+SERPAPI_BASE = "https://serpapi.com/search.json"
+
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119 Safari/537.36"
+}
+
+
+def _random_sleep(min_s=0.6, max_s=1.8):
+    time.sleep(random.uniform(min_s, max_s))
+
+
+def fetch_google_jobs(query, location="India", limit=10):
+    if not SERPAPI_KEY:
+        LOG.warning("SERPAPI_KEY not set. Skipping Google Jobs.")
+        return []
+
+    params = {
+        "engine": "google_jobs",
+        "q": query,
+        "location": location,
+        "api_key": SERPAPI_KEY,
+        "hl": "en"
+    }
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        job_elements = soup.select(selectors['job_card'])
-        
-        if not job_elements:
-            print(f"[HEALER] Could not find job cards on Naukri using selector: '{selectors['job_card']}'. Attempting to self-heal.")
-            new_selector = get_new_selector(response.text, "the main container for a single job posting", selectors['job_card'])
-            if new_selector:
-                update_selectors_file('naukri', 'job_card', new_selector)
-                selectors['job_card'] = new_selector
-                job_elements = soup.select(selectors['job_card'])
-
-        for job_elem in job_elements:
-            posted_date_elem = job_elem.select_one(selectors['posted_date'])
-            posted_text = posted_date_elem.text.lower() if posted_date_elem else 'unknown'
-
-            if 'hour' in posted_text or 'min' in posted_text or 'just now' in posted_text:
-                title_elem = job_elem.select_one(selectors['title'])
-                company_elem = job_elem.select_one(selectors['company'])
-                loc_elem = job_elem.select_one(selectors['location'])
-                
-                if title_elem and company_elem and loc_elem:
-                    jobs.append({
-                        "title": title_elem.text.strip(),
-                        "company": company_elem.text.strip(),
-                        "location": loc_elem.text.strip(),
-                        "description": job_elem.select_one(selectors['description']).text.strip() if job_elem.select_one(selectors['description']) else "N/A",
-                        "link": title_elem['href']
-                    })
+        resp = requests.get(SERPAPI_BASE, params=params, headers=DEFAULT_HEADERS, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
     except Exception as e:
-        print(f"[ERROR] Could not scrape Naukri: {e}")
-    
+        LOG.error("Google Jobs (SerpApi) request failed: %s", e)
+        return []
+
+    jobs = []
+    for job in data.get("jobs_results", [])[:limit]:
+        title = job.get("title")
+        company = job.get("company_name")
+        location_txt = job.get("location")
+        description = job.get("description") or ""
+        link = ""
+        for opt in job.get("apply_options", []):
+            if opt.get("link"):
+                link = opt.get("link")
+                break
+        if not link:
+            for opt in job.get("related_links", []):
+                if opt.get("link"):
+                    link = opt.get("link")
+                    break
+
+        jobs.append({
+            "title": title or "",
+            "company": company or "",
+            "location": location_txt or "",
+            "description": description.strip(),
+            "link": link or "",
+            "source": "Google Jobs"
+        })
+    LOG.info("Google Jobs: fetched %d jobs for query=%s", len(jobs), query)
     return jobs
 
-def fetch_jobs_from_linkedin_scraper(query, location, posted_within_hours=1):
-    selectors = load_selectors('linkedin')
+
+def fetch_ambitionbox_jobs(query, location="India", pages=1):
+    base = "https://www.ambitionbox.com/jobs/search"
     jobs = []
-    time_filter = "r86400" if posted_within_hours <= 24 else ""
-    url = f"https://www.linkedin.com/jobs/search/?keywords={query}&location={location}&{time_filter}&sortBy=R"
-    print(f"[INFO] Scraping LinkedIn URL: {url}")
+    for page in range(1, pages + 1):
+        url = f"{base}?title={quote_plus(query)}&location={quote_plus(location)}&page={page}"
+        try:
+            resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+        except Exception as e:
+            LOG.error("AmbitionBox request failed: %s", e)
+            break
 
-    options = webdriver.ChromeOptions()
-    options.add_argument("--headless")
-    options.add_argument("--log-level=3")
-    
-    driver = None
-    try:
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-        driver.get(url)
-        time.sleep(3)
-        page_source = driver.page_source
-
-        job_cards = driver.find_elements(By.CSS_SELECTOR, selectors['job_card'])
+        candidate_selectors = [
+            "div.jobCard",
+            "div.ab_serp_result",
+            "article.jobCard"
+        ]
+        job_cards = []
+        for sel in candidate_selectors:
+            job_cards = soup.select(sel)
+            if job_cards:
+                break
 
         if not job_cards:
-            print(f"[HEALER] Could not find job cards on LinkedIn using selector: '{selectors['job_card']}'. Attempting to self-heal.")
-            new_selector = get_new_selector(page_source, "the main container for a single job posting", selectors['job_card'])
-            if new_selector:
-                update_selectors_file('linkedin', 'job_card', new_selector)
-                selectors['job_card'] = new_selector
-                job_cards = driver.find_elements(By.CSS_SELECTOR, selectors['job_card'])
+            job_cards = soup.select("a.result-title")
 
         for card in job_cards:
-            try:
-                title = card.find_element(By.CSS_SELECTOR, selectors['title']).text.strip()
-                company = card.find_element(By.CSS_SELECTOR, selectors['company']).text.strip()
-                card_location = card.find_element(By.CSS_SELECTOR, selectors['location']).text.strip()
-                link = card.find_element(By.CSS_SELECTOR, selectors['link']).get_attribute('href')
-                
+            title_tag = card.select_one("h2 > a") or card.select_one("a.job-title") or card.select_one("a.result-title")
+            title = title_tag.get_text(strip=True) if title_tag else None
+
+            comp_tag = card.select_one(".company") or card.select_one(".companyName") or card.select_one(".company-info a")
+            company = comp_tag.get_text(strip=True) if comp_tag else None
+
+            loc_tag = card.select_one(".location") or card.select_one(".locWdgt") or card.select_one(".jobCard__location")
+            location_txt = loc_tag.get_text(strip=True) if loc_tag else location
+
+            link = ""
+            if title_tag and title_tag.has_attr("href"):
+                link = title_tag["href"]
+                if link.startswith("/"):
+                    link = "https://www.ambitionbox.com" + link
+
+            desc_tag = card.select_one(".job-snippet") or card.select_one(".short-desc") or card.select_one(".info")
+            description = desc_tag.get_text(" ", strip=True) if desc_tag else ""
+
+            if title and company:
                 jobs.append({
                     "title": title,
                     "company": company,
-                    "location": card_location,
-                    "description": "Description not available via basic scrape.",
-                    "link": link
+                    "location": location_txt,
+                    "description": description,
+                    "link": link,
+                    "source": "AmbitionBox"
                 })
-            except Exception:
-                continue
-    except Exception as e:
-        print(f"[ERROR] Could not scrape LinkedIn: {e}")
-    finally:
-        if driver:
-            driver.quit()
-    
+
+        _random_sleep(0.5, 1.2)
+
+    LOG.info("AmbitionBox: fetched %d jobs for query=%s", len(jobs), query)
     return jobs
 
-def fetch_all_jobs(query, location, posted_within_hours=1):
-    print("[INFO] Relying on custom self-healing scrapers for this run.")
-    naukri_jobs = fetch_jobs_from_naukri_scraper(query, location, posted_within_hours)
-    linkedin_jobs = fetch_jobs_from_linkedin_scraper(query, location, posted_within_hours)
 
-    all_jobs = naukri_jobs + linkedin_jobs
-    print(f"[INFO] Found a total of {len(all_jobs)} jobs from custom scrapers.")
+def fetch_glassdoor_jobs(query, location="India", pages=1):
+    jobs = []
+    for page in range(1, pages + 1):
+        safe_query = quote_plus(query)
+        safe_location = quote_plus(location)
+        url = f"https://www.glassdoor.co.in/Job/jobs.htm?sc.keyword={safe_query}&locT=C&locId=&locKeyword={safe_location}&p={page}"
+
+        try:
+            resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=15)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, "html.parser")
+        except Exception as e:
+            LOG.error("Glassdoor request failed: %s", e)
+            break
+
+        candidate_selectors = [
+            "li.react-job-listing",
+            "li.jl",
+            "div.jobContainer"
+        ]
+        job_cards = []
+        for sel in candidate_selectors:
+            job_cards = soup.select(sel)
+            if job_cards:
+                break
+
+        if not job_cards:
+            job_cards = soup.select("div.EiJobCard") or []
+
+        for card in job_cards:
+            title_tag = card.select_one("a.jobLink") or card.select_one("a.eiJobLink") or card.select_one(".jobTitle")
+            title = (title_tag.get_text(strip=True) if title_tag else None)
+
+            company_tag = card.select_one(".jobEmpolyerName") or card.select_one(".jobEmpolyerName a") or card.select_one(".jobHeader a")
+            company = (company_tag.get_text(strip=True) if company_tag else None)
+
+            loc_tag = card.select_one(".loc") or card.select_one(".subtle.loc") or card.select_one(".jobLocation")
+            location_txt = (loc_tag.get_text(strip=True) if loc_tag else location)
+
+            link = ""
+            if title_tag and title_tag.has_attr("href"):
+                link = title_tag["href"]
+                if link.startswith("/"):
+                    link = "https://www.glassdoor.co.in" + link
+
+            desc_tag = card.select_one(".jobSnippet") or card.select_one(".job-snippet") or card.select_one(".jobDesc")
+            description = desc_tag.get_text(" ", strip=True) if desc_tag else ""
+
+            if title and company:
+                jobs.append({
+                    "title": title,
+                    "company": company,
+                    "location": location_txt,
+                    "description": description,
+                    "link": link,
+                    "source": "Glassdoor"
+                })
+
+        _random_sleep(0.6, 1.6)
+
+    LOG.info("Glassdoor: fetched %d jobs for query=%s", len(jobs), query)
+    return jobs
+
+
+def dedupe_jobs(jobs):
+    seen = set()
+    unique = []
+    for j in jobs:
+        key = (j.get("title", "").lower(), j.get("company", "").lower(), (j.get("link") or "").lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(j)
+    return unique
+
+
+def fetch_all_jobs(query="cybersecurity", location="India", pages=1):
+    all_jobs = []
+    queries = [query, "ethical hacking", "penetration tester"]
+    for q in queries:
+        all_jobs.extend(fetch_google_jobs(q, location, limit=10))
+        all_jobs.extend(fetch_ambitionbox_jobs(q, location, pages=pages))
+        all_jobs.extend(fetch_glassdoor_jobs(q, location, pages=pages))
+
+    all_jobs = dedupe_jobs(all_jobs)
+
+    if filter_relevant_jobs:
+        try:
+            all_jobs = filter_relevant_jobs(all_jobs)
+        except Exception as e:
+            LOG.error("filter_relevant_jobs failed: %s", e)
+
+    for job in all_jobs:
+        try:
+            if log_job_to_sheet:
+                try:
+                    log_job_to_sheet(
+                        title=job.get("title", ""),
+                        company=job.get("company", ""),
+                        location=job.get("location", ""),
+                        link=job.get("link", ""),
+                        description=job.get("description", ""),
+                        status="scraped"
+                    )
+                except TypeError:
+                    log_job_to_sheet(job)
+        except Exception as e:
+            LOG.debug("Logging to sheet failed: %s", e)
+
+        try:
+            if send_telegram_alert:
+                send_telegram_alert(job)
+        except Exception as e:
+            LOG.debug("Telegram alert failed: %s", e)
+
+    LOG.info("Total jobs returned: %d", len(all_jobs))
     return all_jobs
 
+
+if __name__ == "__main__":
+    results = fetch_all_jobs("cybersecurity", "India", pages=1)
+    for r in results:
+        print(f"{r['title']} | {r['company']} | {r['location']} | {r['source']}\n{r['link']}\n")

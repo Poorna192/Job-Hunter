@@ -12,30 +12,24 @@ import os
 
 QUERY = "Cybersecurity OR Ethical Hacking OR Penetration Testing OR Cybersecurity Internship OR Cybersecurity Trainee"
 LOCATION = "India"
-# Check for jobs posted in the last hour
 POSTED_WITHIN_HOURS = 1
-# Check every hour
 CHECK_INTERVAL_SECONDS = 3600
-
 SEEN_JOBS_FILE = 'seen_jobs.json'
 
 def load_seen_jobs():
-    """Loads the set of seen job IDs from a file."""
     if os.path.exists(SEEN_JOBS_FILE):
         with open(SEEN_JOBS_FILE, 'r') as f:
             try:
                 return set(json.load(f))
             except json.JSONDecodeError:
-                return set() # Return empty set if file is corrupted or empty
+                return set()
     return set()
 
 def save_seen_jobs(seen_jobs_set):
-    """Saves the set of seen job IDs to a file."""
     with open(SEEN_JOBS_FILE, 'w') as f:
         json.dump(list(seen_jobs_set), f)
 
 def run_job_search(seen_jobs):
-    """Runs a single job search cycle."""
     try:
         print(f"\n[INFO] Starting job search at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         

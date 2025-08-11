@@ -1,10 +1,8 @@
-# pdf_generator.py
 from fpdf import FPDF
 import json
 import re
 
 def parse_ai_content(tailored_content):
-    """Parses the plain text AI content into a dictionary."""
     summary_match = re.search(r"AI Summary:\s*(.*?)\s*AI-Selected Experience:", tailored_content, re.DOTALL)
     experience_match = re.search(r"AI-Selected Experience:\s*(.*)", tailored_content, re.DOTALL)
 
@@ -16,7 +14,6 @@ def parse_ai_content(tailored_content):
     return {"summary": summary, "experience": experience_points}
 
 def create_resume_pdf(job, tailored_content):
-    """Creates a tailored PDF resume."""
     try:
         with open('master_profile.json', 'r') as f:
             profile = json.load(f)
@@ -30,7 +27,6 @@ def create_resume_pdf(job, tailored_content):
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # --- Header ---
     pdf.set_font('Helvetica', 'B', 16)
     pdf.cell(0, 10, profile['personal_info']['name'], 0, 1, 'C')
     pdf.set_font('Helvetica', '', 10)
@@ -38,14 +34,12 @@ def create_resume_pdf(job, tailored_content):
     pdf.cell(0, 10, contact_info, 0, 1, 'C')
     pdf.ln(5)
 
-    # --- AI-Generated Summary ---
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(0, 10, 'Professional Summary', 0, 1)
     pdf.set_font('Helvetica', '', 10)
     pdf.multi_cell(0, 5, ai_parts['summary'])
     pdf.ln(5)
 
-    # --- AI-Selected Experience ---
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(0, 10, 'Relevant Experience', 0, 1)
     pdf.set_font('Helvetica', '', 10)
@@ -53,7 +47,6 @@ def create_resume_pdf(job, tailored_content):
         pdf.multi_cell(0, 5, f'• {point}')
     pdf.ln(5)
 
-    # --- Skills Section ---
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(0, 10, 'Technical Skills', 0, 1)
     pdf.set_font('Helvetica', '', 10)
@@ -61,7 +54,6 @@ def create_resume_pdf(job, tailored_content):
     pdf.multi_cell(0, 5, skills_text)
     pdf.ln(5)
     
-    # --- Projects ---
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(0, 10, 'Projects', 0, 1)
     pdf.set_font('Helvetica', '', 10)
@@ -73,7 +65,6 @@ def create_resume_pdf(job, tailored_content):
         pdf.ln(2)
     pdf.ln(5)
 
-    # --- Education ---
     pdf.set_font('Helvetica', 'B', 12)
     pdf.cell(0, 10, 'Education', 0, 1)
     pdf.set_font('Helvetica', 'B', 10)
@@ -82,10 +73,8 @@ def create_resume_pdf(job, tailored_content):
     pdf.set_font('Helvetica', '', 10)
     pdf.cell(0, 5, f"Graduated: {education['dates']} | GPA: {education['gpa']}", 0, 1)
     
-    # --- Save the PDF ---
     company_name = job.get('company', 'UnknownCompany').replace(' ', '_')
     filename = f"Resume_Poornachandra_for_{company_name}.pdf"
     pdf.output(filename)
     print(f"[SUCCESS] Generated PDF resume: {filename}")
     return filename
-

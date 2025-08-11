@@ -103,4 +103,3 @@ Once everything is configured, simply run the main script:
 python3 main.py
 
 The bot will start its first job search cycle. Sit back and wait for the opportunities to arrive in your Telegram!
-

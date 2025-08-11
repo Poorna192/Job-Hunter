@@ -1,5 +1,3 @@
-# job_scraper.py
-import requests
 import time
 from bs4 import BeautifulSoup
 from datetime import datetime
@@ -125,3 +123,4 @@ def fetch_all_jobs(query, location, posted_within_hours=1):
     all_jobs = naukri_jobs + linkedin_jobs
     print(f"[INFO] Found a total of {len(all_jobs)} jobs from custom scrapers.")
     return all_jobs
+
